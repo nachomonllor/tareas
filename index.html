@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6f5c">
+<title>Tareas</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root { --bg:#f4f1ea; --card:#fff; --ink:#1d1d1b; --muted:#77736a; --accent:#1f6f5c; --line:#e2ddd2; --danger:#b23b2e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141513; --card:#1e201d; --ink:#ecebe6; --muted:#9a978e; --accent:#4fb596; --line:#2e302c; --danger:#e0705f; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.4 system-ui, sans-serif;
+         padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 24px); }
+  header { display:flex; align-items:baseline; justify-content:space-between; padding:20px 0 12px; }
+  h1 { margin:0; font-size:28px; }
+  #count { color:var(--muted); font-size:14px; }
+  form { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; display:grid; gap:8px; }
+  input, textarea { width:100%; font:inherit; color:var(--ink); background:transparent; border:1px solid var(--line); border-radius:10px; padding:10px; }
+  textarea { resize:vertical; min-height:60px; }
+  button { font:inherit; border:0; border-radius:10px; padding:10px 14px; cursor:pointer; }
+  .primary { background:var(--accent); color:#fff; font-weight:600; }
+  ul { list-style:none; padding:0; margin:16px 0 0; display:grid; gap:8px; }
+  li { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; display:grid; grid-template-columns:28px 1fr auto; gap:10px; align-items:start; }
+  li input[type=checkbox] { width:24px; height:24px; margin:2px 0 0; accent-color:var(--accent); }
+  .t { font-weight:600; word-break:break-word; }
+  .d { color:var(--muted); font-size:14px; white-space:pre-wrap; word-break:break-word; margin-top:2px; }
+  li.done .t { text-decoration:line-through; color:var(--muted); }
+  .del { background:transparent; color:var(--danger); padding:4px 8px; font-size:20px; line-height:1; }
+  h2 { font-size:14px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:24px 0 0; }
+  .empty { color:var(--muted); text-align:center; padding:24px 0; }
+</style>
+</head>
+<body>
+<header><h1>Tareas</h1><span id="count"></span></header>
+
+<form id="f">
+  <input id="title" placeholder="Nueva tarea" required autocomplete="off">
+  <textarea id="desc" placeholder="Descripción (opcional)"></textarea>
+  <button class="primary">Agregar</button>
+</form>
+
+<ul id="pending"></ul>
+<h2 id="doneTitle" hidden>Hechas</h2>
+<ul id="done"></ul>
+
+<script>
+  const KEY = 'tareas-v1';
+  let tasks = [];
+  try { tasks = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) {}
+
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(tasks)); } catch (e) {} };
+
+  function render() {
+    const pend = document.getElementById('pending'), done = document.getElementById('done');
+    pend.innerHTML = ''; done.innerHTML = '';
+    const open = tasks.filter(t => !t.done);
+    document.getElementById('count').textContent = open.length ? open.length + ' pendientes' : '';
+    document.getElementById('doneTitle').hidden = !tasks.some(t => t.done);
+    if (!tasks.length) pend.innerHTML = '<p class="empty">No hay tareas cargadas.</p>';
+
+    for (const t of tasks) {
+      const li = document.createElement('li');
+      if (t.done) li.className = 'done';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = t.done;
+      cb.onchange = () => { t.done = cb.checked; save(); render(); };
+      const body = document.createElement('div');
+      const ti = document.createElement('div'); ti.className = 't'; ti.textContent = t.title;
+      body.append(ti);
+      if (t.desc) { const d = document.createElement('div'); d.className = 'd'; d.textContent = t.desc; body.append(d); }
+      const del = document.createElement('button');
+      del.className = 'del'; del.textContent = '×'; del.ariaLabel = 'Borrar';
+      del.onclick = () => { if (confirm('¿Borrar "' + t.title + '"?')) { tasks = tasks.filter(x => x !== t); save(); render(); } };
+      li.append(cb, body, del);
+      (t.done ? done : pend).append(li);
+    }
+  }
+
+  document.getElementById('f').onsubmit = e => {
+    e.preventDefault();
+    const title = document.getElementById('title'), desc = document.getElementById('desc');
+    if (!title.value.trim()) return;
+    tasks.unshift({ id: Date.now(), title: title.value.trim(), desc: desc.value.trim(), done: false });
+    save(); render();
+    title.value = ''; desc.value = ''; title.focus();
+  };
+
+  render();
+
+  // Pide al navegador que no borre los datos aunque falte espacio
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  // Hace que funcione sin internet y se pueda instalar
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
